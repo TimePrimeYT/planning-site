@@ -1,30 +1,41 @@
+// 🔥 CONFIG FIREBASE (REMPLACE PAR LA TIENNE)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCND0J6N9XO69lz9EirZJOS8zDB-hVGj3Q",
+    authDomain: "planning-site-e7e9f.firebaseapp.com",
+    projectId: "planning-site-e7e9f",
+    storageBucket: "planning-site-e7e9f.firebasestorage.app",
+    messagingSenderId: "845840241838",
+    appId: "1:845840241838:web:448ea623db8b40dc1a493f",
+    measurementId: "G-XSYDBF3XJ3"
+  };
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const days = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 const startHour = 6;
 const endHour = 23;
 
 const planning = document.getElementById("planning");
 let isAdmin = false;
+let changes = {};
 
-// LOGIN INFO (change ici)
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "1234";
 
-function createPlanning(){
+function createPlanning(data = {}){
     planning.innerHTML = "";
 
     planning.appendChild(createCell("Heure", true));
-
-    days.forEach(day => {
-        planning.appendChild(createCell(day, true));
-    });
+    days.forEach(day => planning.appendChild(createCell(day, true)));
 
     for(let hour = startHour; hour <= endHour; hour++){
         planning.appendChild(createCell(hour + "h - " + (hour+1) + "h", false, true));
 
         days.forEach(day => {
             let key = day + "-" + hour;
-            let saved = localStorage.getItem(key) || "";
-            let cell = createCell(saved);
+            let value = data[key] || "";
+            let cell = createCell(value);
             cell.dataset.key = key;
 
             if(isAdmin){
@@ -34,6 +45,10 @@ function createPlanning(){
 
             planning.appendChild(cell);
         });
+    }
+
+    if(isAdmin){
+        addPublishButton();
     }
 }
 
@@ -50,11 +65,39 @@ function editCell(cell){
     let newValue = prompt("Modifier la tâche :", cell.textContent);
     if(newValue !== null){
         cell.textContent = newValue;
-        localStorage.setItem(cell.dataset.key, newValue);
+        changes[cell.dataset.key] = newValue;
     }
 }
 
-// PANEL BUTTON
+function addPublishButton(){
+    let btn = document.createElement("button");
+    btn.textContent = "Publish";
+    btn.style.position = "fixed";
+    btn.style.bottom = "20px";
+    btn.style.right = "20px";
+    btn.onclick = publishChanges;
+    document.body.appendChild(btn);
+}
+
+function publishChanges(){
+    db.collection("planning").doc("week").set(changes, { merge: true })
+    .then(() => {
+        alert("Modifications publiées !");
+        changes = {};
+    });
+}
+
+function loadPlanning(){
+    db.collection("planning").doc("week").get()
+    .then(doc => {
+        if(doc.exists){
+            createPlanning(doc.data());
+        } else {
+            createPlanning();
+        }
+    });
+}
+
 document.getElementById("panelBtn").onclick = () => {
     document.getElementById("loginModal").style.display = "flex";
 }
@@ -70,10 +113,10 @@ function login(){
     if(user === ADMIN_USER && pass === ADMIN_PASS){
         isAdmin = true;
         closeModal();
-        createPlanning();
+        loadPlanning();
     } else {
         document.getElementById("error").textContent = "Identifiants incorrects";
     }
 }
 
-createPlanning();
+loadPlanning();
